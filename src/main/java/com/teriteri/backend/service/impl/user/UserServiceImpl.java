@@ -15,6 +15,7 @@ import com.teriteri.backend.utils.ESUtil;
 import com.teriteri.backend.utils.OssUtil;
 import com.teriteri.backend.utils.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,6 +62,7 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 根据uid查询用户信息
+     *
      * @param id 用户ID
      * @return 用户可见信息实体类 UserDTO
      */
@@ -75,14 +77,16 @@ public class UserServiceImpl implements UserService {
                 return null;    // 如果uid不存在则返回空
             }
             User finalUser = user;
+            // 使用 runAsync()，一定程度上避免 redis 卡顿导致 业务阻塞；但是 没有考虑到异常处理
             CompletableFuture.runAsync(() -> {
                 redisUtil.setExObjectValue("user:" + finalUser.getUid(), finalUser);  // 默认存活1小时
             }, taskExecutor);
         }
         UserDTO userDTO = new UserDTO();
-        userDTO.setUid(user.getUid());
-        userDTO.setState(user.getState());
+        // 当用户账号已注销时，将对应信息设置为 初始值，保护用户隐私
         if (user.getState() == 2) {
+            userDTO.setUid(user.getUid());
+            userDTO.setState(user.getState());
             userDTO.setNickname("账号已注销");
             userDTO.setAvatar("https://cube.elemecdn.com/9/c2/f0ee8a3c7c9638a54940382568c9dpng.png");
             userDTO.setBackground("https://tinypic.host/images/2023/11/15/69PB2Q5W9D2U7L.png");
@@ -92,30 +96,11 @@ public class UserServiceImpl implements UserService {
             userDTO.setCoin((double) 0);
             userDTO.setVip(0);
             userDTO.setAuth(0);
-            userDTO.setVideoCount(0);
-            userDTO.setFollowsCount(0);
-            userDTO.setFansCount(0);
-            userDTO.setLoveCount(0);
-            userDTO.setPlayCount(0);
             return userDTO;
         }
-        userDTO.setNickname(user.getNickname());
-        userDTO.setAvatar(user.getAvatar());
-        userDTO.setBackground(user.getBackground());
-        userDTO.setGender(user.getGender());
-        userDTO.setDescription(user.getDescription());
-        userDTO.setExp(user.getExp());
-        userDTO.setCoin(user.getCoin());
-        userDTO.setVip(user.getVip());
-        userDTO.setAuth(user.getAuth());
-        userDTO.setAuthMsg(user.getAuthMsg());
-        userDTO.setFollowsCount(0);
-        userDTO.setFansCount(0);
+        BeanUtils.copyProperties(user,userDTO);
         List<Integer> vidList = getPublishedVids(user.getUid());
         if (vidList.isEmpty()) {
-            userDTO.setVideoCount(0);
-            userDTO.setLoveCount(0);
-            userDTO.setPlayCount(0);
             return userDTO;
         }
 
@@ -150,21 +135,8 @@ public class UserServiceImpl implements UserService {
                             .findFirst()
                             .orElse(null);
                     if (user == null) return Stream.empty();
-                    UserDTO userDTO = new UserDTO(
-                            user.getUid(),
-                            user.getNickname(),
-                            user.getAvatar(),
-                            user.getBackground(),
-                            user.getGender(),
-                            user.getDescription(),
-                            user.getExp(),
-                            user.getCoin(),
-                            user.getVip(),
-                            user.getState(),
-                            user.getAuth(),
-                            user.getAuthMsg(),
-                            0,0,0,0,0
-                    );
+                    UserDTO userDTO = new UserDTO();
+                    BeanUtils.copyProperties(user,userDTO);
                     List<Integer> vidList = getPublishedVids(user.getUid());
                     if (vidList.isEmpty()) {
                         return Stream.of(userDTO);

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.concurrent.*;
 
 @Service
@@ -45,6 +46,10 @@ public class VideoStatsServiceImpl implements VideoStatsService {
         // 多线程查redis反而更慢了，所以干脆直接查数据库
         return videoStats;
     }
+
+/*    public List<VideoStats> getVideoStatsByPrefix(){
+
+    }*/
 
     /**
      * 更新指定字段

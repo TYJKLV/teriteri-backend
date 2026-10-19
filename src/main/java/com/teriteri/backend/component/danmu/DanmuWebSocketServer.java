@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.teriteri.backend.mapper.DanmuMapper;
+import com.teriteri.backend.mapper.UserMapper;
 import com.teriteri.backend.mapper.VideoStatsMapper;
 import com.teriteri.backend.pojo.Danmu;
 import com.teriteri.backend.pojo.User;
@@ -35,13 +36,15 @@ public class DanmuWebSocketServer {
     private static RedisUtil redisUtil;
     private static DanmuMapper danmuMapper;
     private static VideoStatsService videoStatsService;
+    private static UserMapper userMapper;
 
     @Autowired
-    public void setDependencies(JwtUtil jwtUtil, RedisUtil redisUtil, DanmuMapper danmuMapper, VideoStatsService videoStatsService) {
+    public void setDependencies(JwtUtil jwtUtil, RedisUtil redisUtil, DanmuMapper danmuMapper, VideoStatsService videoStatsService, UserMapper userMapper) {
         DanmuWebSocketServer.jwtUtil = jwtUtil;
         DanmuWebSocketServer.redisUtil = redisUtil;
         DanmuWebSocketServer.danmuMapper = danmuMapper;
         DanmuWebSocketServer.videoStatsService = videoStatsService;
+        DanmuWebSocketServer.userMapper = userMapper;
     }
 
     // 对每个视频存储该视频下的session集合
@@ -82,9 +85,15 @@ public class DanmuWebSocketServer {
                 session.getBasicRemote().sendText("登录已过期");
                 return;
             }
-            String userId = JwtUtil.getSubjectFromToken(token);
-            String channel = JwtUtil.getClaimFromToken(token, "channel");
-            User user = redisUtil.getObject("security:" + channel + ":" + userId, User.class);
+            Integer uid = Integer.valueOf(JwtUtil.getSubjectFromToken(token));
+            // 用户信息统一走 user:{uid} 缓存；缓存未命中回源数据库
+            User user = redisUtil.getObject("user:" + uid, User.class);
+            if (user == null) {
+                user = userMapper.selectById(uid);
+                if (user != null) {
+                    redisUtil.setExObjectValue("user:" + uid, user);   // 回填，默认存活 1 小时
+                }
+            }
             if (user == null) {
                 session.getBasicRemote().sendText("登录已过期");
                 return;

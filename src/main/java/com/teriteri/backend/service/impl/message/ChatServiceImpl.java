@@ -232,7 +232,7 @@ public class ChatServiceImpl implements ChatService {
              */
 
             // 创建两个线程分别处理对应数据
-            // 先更新 to -> from 的数据
+            // 先更新 from -> to 的数据
             CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
                 QueryWrapper<Chat> queryWrapper1 = new QueryWrapper<>();
                 queryWrapper1.eq("user_id", from).eq("another_id", to);
