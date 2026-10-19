@@ -23,9 +23,13 @@ public class UserDTO {
     private Integer state;  // 0 正常，1 封禁中
     private Integer auth;   // 0 普通用户，1 个人认证，2 机构认证
     private String authMsg; // 认证信息，如 teriteri官方账号
-    private Integer videoCount; // 视频投稿数
-    private Integer followsCount;   // 关注数
-    private Integer fansCount;  // 粉丝数
-    private Integer loveCount;  // 获赞数
-    private Integer playCount;  // 播放数
+
+    // TODO
+    // 目前：关注数、粉丝数是写死的，为 0；之后，补上这一块
+    private Integer followsCount = 0;   // 关注数
+    private Integer fansCount = 0;  // 粉丝数
+
+    private Integer videoCount = 0; // 视频投稿数
+    private Integer loveCount = 0;  // 获赞数
+    private Integer playCount = 0;  // 播放数
 }

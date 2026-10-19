@@ -1,5 +1,6 @@
 package com.teriteri.backend.config.filter;
 
+import com.teriteri.backend.mapper.UserMapper;
 import com.teriteri.backend.pojo.User;
 import com.teriteri.backend.service.impl.user.UserDetailsImpl;
 import com.teriteri.backend.utils.ConstantsUtil;
@@ -31,6 +32,9 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
 
     @Autowired
     private RedisUtil redisUtil;
+
+    @Autowired
+    private UserMapper userMapper;
 
     // Spring框架中，用于路径匹配的核心类
     private static final AntPathMatcher pathMatcher = new AntPathMatcher();
@@ -72,7 +76,6 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
         // 解析token
         boolean verifyToken = jwtUtil.verifyToken(token);
         if (!verifyToken) {
-//            log.error("当前token已过期");
             if (isPublicPath(request.getRequestURI())) {
                 // 公开接口携带了失效token时，以匿名身份放行
                 filterChain.doFilter(request, response);
@@ -82,11 +85,16 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             response.setStatus(403);
             return;
         }
-        String userId = JwtUtil.getSubjectFromToken(token);
-        String channel = JwtUtil.getClaimFromToken(token, "channel");
 
-        // 从redis中获取用户信息
-        User user = redisUtil.getObject("security:" + channel + ":" + userId, User.class);
+        Integer userId = Integer.valueOf(JwtUtil.getSubjectFromToken(token));
+        // 用户信息统一走 user:{uid} 缓存；缓存未命中回源数据库（缓存 miss 不代表未登录）
+        User user = redisUtil.getObject("user:" + userId, User.class);
+        if (user == null) {
+            user = userMapper.selectById(userId);
+            if (user != null) {
+                redisUtil.setExObjectValue("user:" + userId, user);   // 回填，默认存活 1 小时
+            }
+        }
 
         if (user == null) {
             // 用户未登录，走下面逻辑
@@ -97,11 +105,10 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             }
             response.addHeader("message", "not login"); // 设置响应头信息，给前端判断用
             response.setStatus(403);
-//            throw new AuthenticationException("用户未登录");
             return;
         }
 
-        // 存入SecurityContextHolder，这里建议只供读取uid用，其中的状态等非静态数据可能不准，所以建议redis另外存值
+        // 存入 SecurityContextHolder，供 CurrentUser 读取当前登录用户（数据来自 user:{uid} 缓存，最多旧 1 小时）
         UserDetailsImpl loginUser = new UserDetailsImpl(user);
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(loginUser, null, null);
@@ -130,10 +137,10 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
  *    │              └─否──► 返回 403 + message: not login
  *    │
  *    ▼
- * 从 JWT 取 userId、channel
+ * 从 JWT 取 userId
  *    │
  *    ▼
- * 去 Redis 查 security:channel:userId
+ * 去 Redis 查 user:userId（缓存未命中回源数据库并回填）
  *    │
  *    ├─ 没查到 ──► 是公开接口？ ──是──► 放行（匿名）
  *    │              │

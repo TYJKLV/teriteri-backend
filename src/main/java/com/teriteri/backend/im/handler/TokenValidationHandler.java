@@ -2,6 +2,7 @@ package com.teriteri.backend.im.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.teriteri.backend.im.IMServer;
+import com.teriteri.backend.mapper.UserMapper;
 import com.teriteri.backend.pojo.Command;
 import com.teriteri.backend.pojo.IMResponse;
 import com.teriteri.backend.pojo.User;
@@ -22,10 +23,12 @@ public class TokenValidationHandler extends SimpleChannelInboundHandler<TextWebS
     // final 修饰 字段，构造器进行初始化，避免被修改
     private final JwtUtil jwtUtil;
     private final RedisUtil redisUtil;
+    private final UserMapper userMapper;
 
-    public TokenValidationHandler(JwtUtil jwtUtil, RedisUtil redisUtil) {
+    public TokenValidationHandler(JwtUtil jwtUtil, RedisUtil redisUtil, UserMapper userMapper) {
         this.jwtUtil = jwtUtil;
         this.redisUtil = redisUtil;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -85,12 +88,18 @@ public class TokenValidationHandler extends SimpleChannelInboundHandler<TextWebS
             log.error("当前token已过期");
             return null;
         }
-        String userId = JwtUtil.getSubjectFromToken(token);
-        String channel = JwtUtil.getClaimFromToken(token, "channel");
-        User user = redisUtil.getObject("security:" + channel + ":" + userId, User.class);
+        Integer uid = Integer.valueOf(JwtUtil.getSubjectFromToken(token));
+        // 用户信息统一走 user:{uid} 缓存；缓存未命中回源数据库
+        User user = redisUtil.getObject("user:" + uid, User.class);
+        if (user == null) {
+            user = userMapper.selectById(uid);
+            if (user != null) {
+                redisUtil.setExObjectValue("user:" + uid, user);   // 回填，默认存活 1 小时
+            }
+        }
 
         if (user == null) {
-            log.error("用户未登录");
+            log.error("用户不存在");
             return null;
         }
 

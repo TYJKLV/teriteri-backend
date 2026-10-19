@@ -3,6 +3,7 @@ package com.teriteri.backend.im;
 import com.teriteri.backend.im.handler.ChatHandler;
 import com.teriteri.backend.im.handler.TokenValidationHandler;
 import com.teriteri.backend.im.handler.WebSocketHandler;
+import com.teriteri.backend.mapper.UserMapper;
 import com.teriteri.backend.utils.JwtUtil;
 import com.teriteri.backend.utils.RedisUtil;
 import io.netty.bootstrap.ServerBootstrap;
@@ -34,6 +35,8 @@ public class IMServer implements CommandLineRunner {
     private JwtUtil jwtUtil;
     @Autowired
     private RedisUtil redisUtil;
+    @Autowired
+    private UserMapper userMapper;
     @Autowired
     private ChatHandler chatHandler;
 
@@ -73,7 +76,7 @@ public class IMServer implements CommandLineRunner {
                                 // 对 Http 消息做聚合操作方便处理，产生 FullHttpRequest 和 FullHttpResponse
                                 // 1024 * 64 是单条信息最长字节数，也就是 64KB
                                 .addLast(new HttpObjectAggregator(1024 * 64))
-                                .addLast(new TokenValidationHandler(jwtUtil,redisUtil))
+                                .addLast(new TokenValidationHandler(jwtUtil,redisUtil,userMapper))
                                 // 添加 WebSocket 支持
                                 .addLast(new WebSocketServerProtocolHandler("/im"))
                                 .addLast(new WebSocketHandler(redisUtil,chatHandler));

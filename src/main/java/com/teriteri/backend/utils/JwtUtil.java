@@ -26,11 +26,6 @@ public class JwtUtil {
     @Autowired
     private RedisUtil redisUtil;
 
-    // 有效期2天，记得修改 UserAccountServiceImpl 的 login 中redis的时间，注意单位，这里是毫秒
-    // public static final long JWT_TTL = 60 * 60 * 24 * 2;
-    // 旧的 JWT_KEY
-    // public static final String JWT_KEY = "bEn2xiAnG0mU2TERITERI0YOu5HzH0hE1CwJ1GOnG1tOnG6kAifAwAnchEnG";
-
     public static String getUUID() {
         return UUID.randomUUID().toString().replaceAll("-", "");
     }
@@ -81,7 +76,7 @@ public class JwtUtil {
                 .compact();
 
         try {
-            //缓存token信息，管理员和用户之间不要冲突                           单位是 ms，因此，要乘 1000，才等于 2天
+            //缓存token信息，管理员和用户之间不要冲突                              单位是 ms
             redisUtil.setExValue("token:" + channel + ":" + uid, token, JWT_TTL * 1000L, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             log.error("存储redis数据异常", e);

@@ -26,7 +26,7 @@ public class CurrentUser {
         UsernamePasswordAuthenticationToken authenticationToken =
                 (UsernamePasswordAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
         UserDetailsImpl loginUser = (UserDetailsImpl) authenticationToken.getPrincipal();
-        User suser = loginUser.getUser();   // 这里的user是登录时存的security:user，因为是静态数据，可能会跟实际的有区别，所以只能用作获取uid用
+        User suser = loginUser.getUser();   // 过滤器放入上下文的用户快照（来自 user:{uid} 缓存），只用作获取 uid
         return suser.getUid();
     }
 
@@ -39,8 +39,10 @@ public class CurrentUser {
         User user = redisUtil.getObject("user:" + uid, User.class);
         if (user == null) {
             user = userMapper.selectById(uid);
-            redisUtil.setExObjectValue("user:" + user.getUid(), user);
+            if (user != null) {
+                redisUtil.setExObjectValue("user:" + uid, user);   // 回填，默认存活 1 小时
+            }
         }
-        return (user.getRole() == 1 || user.getRole() == 2);
+        return (user != null && (user.getRole() == 1 || user.getRole() == 2));
     }
 }

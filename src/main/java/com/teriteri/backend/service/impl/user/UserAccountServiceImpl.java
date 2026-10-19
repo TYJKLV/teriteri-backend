@@ -25,7 +25,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +33,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 
 import static com.teriteri.backend.utils.ConstantsUtil.*;
 
@@ -211,8 +209,8 @@ public class UserAccountServiceImpl implements UserAccountService {
         }
 
         // 顺便更新redis中的数据
-        // TODO
         redisUtil.setExObjectValue("user:" + user.getUid(), user);  // 默认存活1小时
+
         // 检查账号状态，1 表示封禁中，不允许登录
         // 这里的账号状态检验，替代了 UserDetailsImpl中的 四个 isXX()
         if (user.getState() == 1) {
@@ -223,14 +221,6 @@ public class UserAccountServiceImpl implements UserAccountService {
 
         //将uid封装成一个 JWt token，同时token也会被缓存到redis中
         String token = jwtUtil.createToken(user.getUid().toString(), channel);
-        try {
-            // 把完整的用户信息存入redis， TTL 跟token一样
-            // 这里缓存的user信息建议只供读取uid用，其中的状态等非静态数据可能不准，所以 redis另外存值           过期时间：2天
-            redisUtil.setExObjectValue("security:" + channel + ":" + user.getUid(), user, JWT_TTL, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            log.error("存储redis数据失败", e);
-            throw e;
-        }
 
         // 每次登录顺便返回user信息，就省去再次发送一次获取用户个人信息的请求
         UserDTO userDTO = new UserDTO();
@@ -333,7 +323,6 @@ public class UserAccountServiceImpl implements UserAccountService {
         Integer LoginUserId = currentUser.getUserId();
         // 清除redis中该用户的登录认证数据
         redisUtil.delValue("token:user:" + LoginUserId);
-        redisUtil.delValue("security:user:" + LoginUserId);
         redisUtil.delMember("login_member", LoginUserId);   // 从在线用户集合中移除
 
 
@@ -363,7 +352,6 @@ public class UserAccountServiceImpl implements UserAccountService {
         Integer LoginUserId = currentUser.getUserId();
         // 清除redis中该用户的登录认证数据
         redisUtil.delValue("token:admin:" + LoginUserId);
-        redisUtil.delValue("security:admin:" + LoginUserId);
     }
 
     @Override
@@ -375,11 +363,14 @@ public class UserAccountServiceImpl implements UserAccountService {
             return customResponse;
         }
 
-        // 取出当前登录的用户
-        UsernamePasswordAuthenticationToken authenticationToken1 =
-                (UsernamePasswordAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
-        UserDetailsImpl userDetails1 = (UserDetailsImpl) authenticationToken1.getPrincipal();
-        User user = userDetails1.getUser();
+        // 取出当前登录的用户（以数据库为准，这里需要 username 作为认证主体）
+        Integer uid = currentUser.getUserId();
+        User user = userMapper.selectById(uid);
+        if (user == null) {
+            customResponse.setCode(404);
+            customResponse.setMessage("用户不存在");
+            return customResponse;
+        }
 
         // 验证旧密码
         UsernamePasswordAuthenticationToken authenticationToken2 =

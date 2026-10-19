@@ -45,20 +45,6 @@ public class EventListenerService {
     public static List<RedisUtil.ZObjScore> hotSearchWords = new ArrayList<>();     // 上次更新的热搜词条
 
     /**
-     * 轮询用户登录状态，将登录过期但还在在线集合的用户移出集合 (现在改用websocket实时更新用户在线状态就弃用这个定时任务了)
-     */
-//    @Scheduled(fixedDelay = 1000 * 60 * 10) // 10分钟轮询一次，记得启动类加上 @EnableScheduling 注解以启动任务调度功能
-//    public void updateLoginMember() {
-//        Set<Object> lm = redisUtil.getMembers("login_member");
-////        System.out.println(lm);
-//        for (Object id: lm) {
-//            if (!redisUtil.isExist("security:user:" + id)) {
-//                redisUtil.delMember("login_member", id);
-//            }
-//        }
-//    }
-
-    /**
      * 每一小时更新一次热搜词条热度
      */
     @Scheduled(fixedDelay = 1000 * 60 * 60)
