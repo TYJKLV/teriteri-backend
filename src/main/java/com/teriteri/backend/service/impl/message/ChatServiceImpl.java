@@ -246,20 +246,20 @@ public class ChatServiceImpl implements ChatService {
                 redisUtil.zset("chat_zset:" + from, chat1.getId());    // 添加到这个用户的最近聊天的有序集合
             }, taskExecutor);
 
-            // 再查询 from -> to 的数据
+            // 再查询 to -> from 的数据
             CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
                 QueryWrapper<Chat> queryWrapper2 = new QueryWrapper<>();
                 queryWrapper2.eq("user_id", to).eq("another_id", from);
                 Chat chat2 = chatMapper.selectOne(queryWrapper2);
 
+                // 如果对方在窗口就不更新未读
                 if (online) {
-                    // 如果对方在窗口就不更新未读
+                    // 如果对方没聊过天 就创建聊天
                     if (chat2 == null) {
-                        // 如果对方没聊过天 就创建聊天
                         chat2 = new Chat(null, to, from, 0, 0, new Date());
                         chatMapper.insert(chat2);
+                    // 如果聊过 就只更新时间和未移除
                     } else {
-                        // 如果聊过 就只更新时间和未移除
                         UpdateWrapper<Chat> updateWrapper2 = new UpdateWrapper<>();
                         updateWrapper2.eq("id", chat2.getId())
                                 .set("is_deleted", 0)
@@ -267,14 +267,14 @@ public class ChatServiceImpl implements ChatService {
                         chatMapper.update(null, updateWrapper2);
                     }
                     redisUtil.zset("chat_zset:" + to, chat2.getId());    // 添加到这个用户的最近聊天的有序集合
+                // 如果不在窗口就未读+1
                 } else {
-                    // 如果不在窗口就未读+1
+                    // 如果对方没聊过天 就创建聊天
                     if (chat2 == null) {
-                        // 如果对方没聊过天 就创建聊天
                         chat2 = new Chat(null, to, from, 0, 1, new Date());
                         chatMapper.insert(chat2);
+                    // 如果聊过 就更新未读和时间和未移除
                     } else {
-                        // 如果聊过 就更新未读和时间和未移除
                         UpdateWrapper<Chat> updateWrapper2 = new UpdateWrapper<>();
                         updateWrapper2.eq("id", chat2.getId())
                                 .set("is_deleted", 0)
@@ -336,7 +336,7 @@ public class ChatServiceImpl implements ChatService {
             chatMapper.update(null, updateWrapper);
 
         } catch (Exception e) {
-            log.error("更新聊天窗口在线状态失败: " + e);
+            log.error("更新聊天窗口在线状态失败: ", e);
         }
     }
 
@@ -352,7 +352,7 @@ public class ChatServiceImpl implements ChatService {
             // 删除key更新为离开状态
             redisUtil.delValue(key);
         } catch (Exception e) {
-            log.error("更新聊天窗口在线状态失败: " + e);
+            log.error("更新聊天窗口在线状态失败: ", e);
         }
     }
 }

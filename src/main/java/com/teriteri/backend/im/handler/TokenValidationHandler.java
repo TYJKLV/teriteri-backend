@@ -52,8 +52,9 @@ public class TokenValidationHandler extends SimpleChannelInboundHandler<TextWebS
                     // 存在 uid为 key 的 set集合，则返回；若不存在，创建一个线程安全的 set集合，放入Map并返回
                 .computeIfAbsent(uid, k -> ConcurrentHashMap.newKeySet())
                 .add(ctx.channel());
-
-            redisUtil.addMember("login_member", uid);   // 将用户添加到在线用户集合
+            //  login_member:当前有 IM 长连接 的用户 uid 集合
+            //  将用户添加到在线用户集合
+            redisUtil.addMember("login_member", uid);
             // 移除token验证处理器，以便以后使用无需判断
             ctx.pipeline().remove(TokenValidationHandler.class);
             // 保持消息的引用计数，以确保消息不会被释放

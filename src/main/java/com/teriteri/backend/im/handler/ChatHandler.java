@@ -62,8 +62,8 @@ public class ChatHandler {
 
             redisUtil.zset("chat_detailed_zset:" + user_id + ":" + chatDetailed.getAnotherId(), chatDetailed.getId());
             redisUtil.zset("chat_detailed_zset:" + chatDetailed.getAnotherId() + ":" + user_id, chatDetailed.getId());
-            // TODO
-            // 涉及到 ChatServiceImpl，ChatHandler 现在并不能搞清楚
+
+            // online = whisper:to:from (anotherId:user_id)
             boolean online = chatService.updateChat(user_id, chatDetailed.getAnotherId());
 
             // 转发到发送者和接收者的全部channel
@@ -96,7 +96,7 @@ public class ChatHandler {
             }
 
         } catch (Exception e) {
-            log.error("发送聊天信息时出错了：" + e);
+            log.error("发送聊天信息时出错了：", e);
             ctx.channel().writeAndFlush(IMResponse.error("发送消息时出错了 Σ(ﾟдﾟ;)"));
         }
     }
@@ -155,8 +155,17 @@ public class ChatHandler {
             }
 
         } catch (Exception e) {
-            log.error("撤回聊天信息时出错了：" + e);
+            log.error("撤回聊天信息时出错了：", e);
             ctx.channel().writeAndFlush(IMResponse.error("撤回消息时出错了 Σ(ﾟдﾟ;)"));
         }
     }
 }
+/*  send()中创建的 map集合有什么用？
+ *  ChatHandler 里的 map，是一个给前端的大礼包，里面装了前端重绘界面需要的所有材料
+    Map<String, Object> map = new HashMap<>();
+    map.put("type", "接收");       // 告诉前端：这是一条收到的新消息
+    map.put("online", online);     // 告诉前端：对方现在在不在聊天窗口里？（决定要不要放提示音/红点）
+    map.put("detail", chatDetailed); // 核心材料：气泡的内容（谁发的、什么时间、文字是什么）
+    map.put("chat", chatService.getChat(...)); // 会话材料：更新左侧列表的排序、最新时间、未读数
+    map.put("user", userService.getUserById(user_id)); // 用户材料：发送者的头像、昵称，画气泡旁边的头像
+ */

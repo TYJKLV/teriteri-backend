@@ -83,7 +83,7 @@ public class UserAccountServiceImpl implements UserAccountService {
      * @param confirmedPassword 确认密码
      * @return CustomResponse对象
      */
-    // 同 updateVideoStatus：esUtil.addUser 抛的是受检异常 IOException，必须显式声明回滚。
+    // 因为注解默认作用于 UncheckedException，而`IOException 属于 CheckedException
     // 否则 ES 故障时账号其实已经建好（能登录），但页面提示"注册失败"，用户重试还会被告知"账号已存在"
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -172,27 +172,28 @@ public class UserAccountServiceImpl implements UserAccountService {
     }
 
     /**
-     * 用户登录
-     *
      * @param username 账号
      * @param password 密码
-     * @return CustomResponse对象
+     * @param isAdmin  true：管理员登录  false：用户登录
+     * @return
      */
     @Override
-    public CustomResponse login(String username, String password) {
+    public CustomResponse login(String username, String password, boolean isAdmin) {
+        String channel = isAdmin ? "admin" : "user";
         CustomResponse customResponse = new CustomResponse();
 
         //验证是否能正常登录
         //将用户名和密码封装成一个类，这个类不会存明文了，将是加密后的字符串
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(username, password);
-        //该构造器，authenticated默认为 false，表示还没有进行 认证
+        //该构造方法，authenticated默认为 false，表示还没有进行 认证
 
         // 用户名或密码错误会抛出异常
         Authentication authenticate;
         try {
             authenticate = authenticationProvider.authenticate(authenticationToken);
         } catch (Exception e) {
+            log.error("登录校验失败", e);
             customResponse.setCode(403);
             customResponse.setMessage("账号或密码不正确");
             return customResponse;
@@ -202,82 +203,8 @@ public class UserAccountServiceImpl implements UserAccountService {
         UserDetailsImpl loginUser = (UserDetailsImpl) authenticate.getPrincipal();
         User user = loginUser.getUser();
 
-        // tk：冗余代码
-        /*// 顺便更新redis中的数据
-        redisUtil.setExObjectValue("user:" + user.getUid(), user);  // 默认存活时间：1h*/
-
-        // 检查账号状态，1 表示封禁中，不允许登录
-        // 这里的账号状态检验，替代了 UserDetailsImpl中的 四个 isXX()
-        if (user.getState() == 1) {
-            customResponse.setCode(403);
-            customResponse.setMessage("账号异常，封禁中");
-            return customResponse;
-        }
-
-        //将uid封装成一个jwttoken，同时token也会被缓存到redis中
-        String token = jwtUtil.createToken(user.getUid().toString(), "user");
-
-        try {
-            // 把完整的用户信息存入redis，时间跟token一样，注意单位；
-            // 这里缓存的user信息建议只供读取uid用，其中的状态等非静态数据可能不准，所以 redis另外存值           过期时间：2天
-            redisUtil.setExObjectValue("security:user:" + user.getUid(), user, JWT_TTL, TimeUnit.SECONDS);
-            // 将该用户放到redis中在线集合
-//            redisUtil.addMember("login_member", user.getUid());
-        } catch (Exception e) {
-            log.error("存储redis数据失败");
-            throw e;
-        }
-
-        // 每次登录顺便返回user信息，就省去再次发送一次获取用户个人信息的请求
-        UserDTO userDTO = new UserDTO();
-        // tk：
-        BeanUtils.copyProperties(user, userDTO); //将 user对应字段 拷贝到 userDTO中
-/*      userDTO.setUid(user.getUid());
-        userDTO.setNickname(user.getNickname());
-        userDTO.setAvatar(user.getAvatar());
-        userDTO.setBackground(user.getBackground());
-        userDTO.setGender(user.getGender());
-        userDTO.setDescription(user.getDescription());
-        userDTO.setExp(user.getExp());
-        userDTO.setCoin(user.getCoin());
-        userDTO.setVip(user.getVip());
-        userDTO.setState(user.getState());
-        userDTO.setAuth(user.getAuth());
-        userDTO.setAuthMsg(user.getAuthMsg());*/
-
-        Map<String, Object> final_map = new HashMap<>();
-        final_map.put("token", token);
-        final_map.put("user", userDTO);
-        customResponse.setMessage("登录成功");
-        customResponse.setData(final_map);
-        return customResponse;
-    }
-
-    /**
-     * 管理员登录
-     *
-     * @param username 账号
-     * @param password 密码
-     * @return CustomResponse对象
-     */
-    @Override
-    public CustomResponse adminLogin(String username, String password) {
-        CustomResponse customResponse = new CustomResponse();
-        UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(username, password);
-        // 用户名或密码错误会抛出异常
-        Authentication authenticate;
-        try {
-            authenticate = authenticationProvider.authenticate(authenticationToken);
-        } catch (Exception e) {
-            customResponse.setCode(403);
-            customResponse.setMessage("账号或密码不正确");
-            return customResponse;
-        }
-        UserDetailsImpl loginUser = (UserDetailsImpl) authenticate.getPrincipal();
-        User user = loginUser.getUser();
         // 普通用户无权访问
-        if (user.getRole() == 0) {
+        if (isAdmin && user.getRole() == 0) {
             customResponse.setCode(403);
             customResponse.setMessage("您不是管理员，无权访问");
             return customResponse;
@@ -287,27 +214,36 @@ public class UserAccountServiceImpl implements UserAccountService {
         // TODO
         redisUtil.setExObjectValue("user:" + user.getUid(), user);  // 默认存活1小时
         // 检查账号状态，1 表示封禁中，不允许登录
+        // 这里的账号状态检验，替代了 UserDetailsImpl中的 四个 isXX()
         if (user.getState() == 1) {
             customResponse.setCode(403);
             customResponse.setMessage("账号异常，封禁中");
             return customResponse;
         }
+
         //将uid封装成一个 JWt token，同时token也会被缓存到redis中
-        String token = jwtUtil.createToken(user.getUid().toString(), "admin");
+        String token = jwtUtil.createToken(user.getUid().toString(), channel);
         try {
-            redisUtil.setExObjectValue("security:admin:" + user.getUid(), user, JWT_TTL, TimeUnit.SECONDS);
+            // 把完整的用户信息存入redis， TTL 跟token一样
+            // 这里缓存的user信息建议只供读取uid用，其中的状态等非静态数据可能不准，所以 redis另外存值           过期时间：2天
+            redisUtil.setExObjectValue("security:" + channel + ":" + user.getUid(), user, JWT_TTL, TimeUnit.SECONDS);
         } catch (Exception e) {
-            log.error("存储redis数据失败");
+            log.error("存储redis数据失败", e);
             throw e;
         }
+
         // 每次登录顺便返回user信息，就省去再次发送一次获取用户个人信息的请求
         UserDTO userDTO = new UserDTO();
+        /*
+           将 user对应字段 拷贝到 userDTO中，有两种方式
+           1. 通过 setXX()，一个一个给字段赋值
+           2. 使用 工具类提供的 api
+         */
         BeanUtils.copyProperties(user, userDTO);
-
         Map<String, Object> final_map = new HashMap<>();
         final_map.put("token", token);
         final_map.put("user", userDTO);
-        customResponse.setMessage("欢迎回来，主人≥⏝⏝≤");
+        customResponse.setMessage(isAdmin ? "欢迎回来，主人≥⏝⏝≤" : "登录成功");
         customResponse.setData(final_map);
         return customResponse;
     }

@@ -84,7 +84,7 @@ public class ChatDetailedServiceImpl implements ChatDetailedService {
                 return false;
             }
         } catch (Exception e) {
-            log.error("删除消息记录时出错了" + e);
+            log.error("删除消息记录时出错了", e);
             return false;
         }
     }

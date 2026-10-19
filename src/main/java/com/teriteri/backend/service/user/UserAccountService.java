@@ -16,20 +16,13 @@ public interface UserAccountService {
     CustomResponse register(String username, String password, String confirmedPassword) throws IOException;
 
     /**
-     * 用户登录
-     * @param username 账号
-     * @param password 密码
+     * 登录
+     * @param username  账号
+     * @param password  密码
+     * @param isAdmin   true：管理员登录  false：用户登录
      * @return CustomResponse对象
      */
-    CustomResponse login(String username, String password);
-
-    /**
-     * 管理员登录
-     * @param username 账号
-     * @param password 密码
-     * @return CustomResponse对象
-     */
-    CustomResponse adminLogin(String username, String password);
+    CustomResponse login(String username, String password , boolean isAdmin);
 
     /**
      * 获取用户个人信息

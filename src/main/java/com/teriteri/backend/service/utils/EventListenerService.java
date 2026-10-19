@@ -240,11 +240,11 @@ public class EventListenerService {
                     }
                     redisUtil.zsetOfCollectionByTime(key, zObjTimes);
                 } catch (Exception e) {
-                    log.error("同步某对用户聊天记录到redis时出错了：" + e);
+                    log.error("同步某对用户聊天记录到redis时出错了：" , e);
                 }
             }
         } catch (Exception e) {
-            log.error("每天同步聊天记录时出错了：" + e);
+            log.error("每天同步聊天记录时出错了：" , e);
         }
 
     }

@@ -80,7 +80,6 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             }
             response.addHeader("message", "not login"); // 设置响应头信息，给前端判断用
             response.setStatus(403);
-//            throw new AuthenticationException("当前token已过期");
             return;
         }
         String userId = JwtUtil.getSubjectFromToken(token);

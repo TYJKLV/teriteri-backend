@@ -50,7 +50,7 @@ public class SecurityConfig {
      *   3. 所以我们给它专门塞一张作废的申请表——表的存在让 Boot 不再自动注册它；而表自己是 disabled，也不会注册它。
      */
     @Bean
-    public FilterRegistrationBean<JwtAuthenticationTokenFilter> jwtFilterRegistration(JwtAuthenticationTokenFilter filter){ // 自动注入方法参数
+    public FilterRegistrationBean<JwtAuthenticationTokenFilter> jwtFilterRegistration(JwtAuthenticationTokenFilter filter){
         FilterRegistrationBean<JwtAuthenticationTokenFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;

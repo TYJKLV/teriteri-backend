@@ -26,8 +26,7 @@ public class TestComment {
 
     @Test
     public void test(){
-        String s = " " == null ? null:" ";
-        System.out.println("1" + s + "1");
+        System.out.println( Runtime.getRuntime().availableProcessors() == 16);
     }
 
     @Test

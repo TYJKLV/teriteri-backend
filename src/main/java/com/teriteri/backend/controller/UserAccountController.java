@@ -46,7 +46,7 @@ public class UserAccountController {
     public CustomResponse login(@RequestBody Map<String, String> map) {
         String username = map.get("username");
         String password = map.get("password");
-        return userAccountService.login(username, password);
+        return userAccountService.login(username, password,false);
     }
 
     /**
@@ -58,7 +58,7 @@ public class UserAccountController {
     public CustomResponse adminLogin(@RequestBody Map<String, String> map) {
         String username = map.get("username");
         String password = map.get("password");
-        return userAccountService.adminLogin(username, password);
+        return userAccountService.login(username, password,true);
     }
 
     /**

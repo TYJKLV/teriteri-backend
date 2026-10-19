@@ -32,7 +32,7 @@ public class ESUtil {
             ESVideo esVideo = new ESVideo(video.getVid(), video.getUid(), video.getTitle(), video.getMcId(), video.getScId(), video.getTags(), video.getStatus());
             client.index(i -> i.index("video").id(esVideo.getVid().toString()).document(esVideo));
         } catch (IOException e) {
-            log.error("添加视频文档到ElasticSearch时出错了：" + e);
+            log.error("添加视频文档到ElasticSearch时出错了：", e);
             throw e;
         }
     }
@@ -45,7 +45,7 @@ public class ESUtil {
         try {
             client.delete(d -> d.index("video").id(vid.toString()));
         } catch (IOException e) {
-            log.error("删除ElasticSearch视频文档时失败了：" + e);
+            log.error("删除ElasticSearch视频文档时失败了：" , e);
             throw e;
         } catch (ElasticsearchException e) {
             // 文档本就不存在（ES 曾经不可用 / 索引漏建留下的历史欠账）时，删除对它而言等价于成功。
@@ -55,7 +55,7 @@ public class ESUtil {
                 log.warn("ES 中视频 {} 的文档本就不存在，跳过删除", vid);
                 return;
             }
-            log.error("删除ElasticSearch视频文档时失败了：" + e);
+            log.error("删除ElasticSearch视频文档时失败了：" , e);
             throw e;
         }
     }
@@ -70,7 +70,7 @@ public class ESUtil {
             // docAsUpsert：文档不存在时（如索引漏建、ES 曾不可用）直接按完整文档写入，避免 document_missing_exception 导致审核失败
             client.update(u -> u.index("video").id(video.getVid().toString()).doc(esVideo).docAsUpsert(true), ESVideo.class);
         } catch (IOException e) {
-            log.error("更新ElasticSearch视频文档时出错了：" + e);
+            log.error("更新ElasticSearch视频文档时出错了：" , e);
             throw e;
         }
     }
@@ -95,7 +95,7 @@ public class ESUtil {
             CountResponse countResponse = client.count(countRequest);
             return countResponse.count();
         } catch (IOException e) {
-            log.error("查询ES相关视频数量时出错了：" + e);
+            log.error("查询ES相关视频数量时出错了：" , e);
             return 0L;
         }
     }
@@ -125,7 +125,7 @@ public class ESUtil {
             }
             return list;
         } catch (IOException e) {
-            log.error("查询ES相关视频文档时出错了：" + e);
+            log.error("查询ES相关视频文档时出错了：" , e);
             return Collections.emptyList();
         }
     }
@@ -140,7 +140,7 @@ public class ESUtil {
             ESUser esUser = new ESUser(user.getUid(), user.getNickname());
             client.index(i -> i.index("user").id(esUser.getUid().toString()).document(esUser));
         } catch (IOException e) {
-            log.error("添加用户文档到elasticsearch时出错了：" + e);
+            log.error("添加用户文档到elasticsearch时出错了：" , e);
             throw e;
         }
     }
@@ -153,7 +153,7 @@ public class ESUtil {
         try {
             client.delete(d -> d.index("user").id(uid.toString()));
         } catch (IOException e) {
-            log.error("删除ElasticSearch用户文档时失败了：" + e);
+            log.error("删除ElasticSearch用户文档时失败了：" , e);
             throw e;
         }
     }
@@ -168,7 +168,7 @@ public class ESUtil {
             // 同 updateVideo，文档缺失时兜底写入
             client.update(u -> u.index("user").id(user.getUid().toString()).doc(esUser).docAsUpsert(true), ESUser.class);
         } catch (IOException e) {
-            log.error("更新ElasticSearch用户文档时出错了：" + e);
+            log.error("更新ElasticSearch用户文档时出错了：" , e);
             throw e;
         }
     }
@@ -185,7 +185,7 @@ public class ESUtil {
             CountResponse countResponse = client.count(countRequest);
             return countResponse.count();
         } catch (IOException e) {
-            log.error("查询ES相关用户数量时出错了：" + e);
+            log.error("查询ES相关用户数量时出错了：" , e);
             return 0L;
         }
     }
@@ -208,7 +208,7 @@ public class ESUtil {
             }
             return list;
         } catch (IOException e) {
-            log.error("查询ES相关用户文档时出错了：" + e);
+            log.error("查询ES相关用户文档时出错了：" , e);
             return Collections.emptyList();
         }
     }
@@ -225,7 +225,7 @@ public class ESUtil {
             ESSearchWord esSearchWord = new ESSearchWord(text);
             client.index(i -> i.index("search_word").document(esSearchWord));
         } catch (IOException e) {
-            log.error("添加搜索词文档到elasticsearch时出错了：" + e);
+            log.error("添加搜索词文档到elasticsearch时出错了：" , e);
         }
     }
 
@@ -247,7 +247,7 @@ public class ESUtil {
             }
             return list;
         } catch (IOException e) {
-            log.error("获取ES搜索提示词时出错了：" + e);
+            log.error("获取ES搜索提示词时出错了：" , e);
             return Collections.emptyList();
         }
     }
