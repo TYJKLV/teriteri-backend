@@ -1,8 +1,6 @@
 package com.teriteri.backend.service.impl.video;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.teriteri.backend.mapper.VideoMapper;
-import com.teriteri.backend.mapper.VideoStatsMapper;
 import com.teriteri.backend.pojo.CustomResponse;
 import com.teriteri.backend.pojo.Video;
 import com.teriteri.backend.pojo.VideoStats;
@@ -10,6 +8,7 @@ import com.teriteri.backend.pojo.dto.VideoUploadInfoDTO;
 import com.teriteri.backend.service.utils.CurrentUser;
 import com.teriteri.backend.service.video.VideoUploadService;
 import com.teriteri.backend.utils.ESUtil;
+import com.teriteri.backend.utils.FileType;
 import com.teriteri.backend.utils.OssUtil;
 import com.teriteri.backend.utils.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -39,10 +37,7 @@ public class VideoUploadServiceImpl implements VideoUploadService {
     private String CHUNK_DIRECTORY;   // 分片存储目录
 
     @Autowired
-    private VideoMapper videoMapper;
-
-    @Autowired
-    private VideoStatsMapper videoStatsMapper;
+    private VideoPersistService videoPersistService;
 
     @Autowired
     private RedisUtil redisUtil;
@@ -50,8 +45,8 @@ public class VideoUploadServiceImpl implements VideoUploadService {
     @Autowired
     private CurrentUser currentUser;
 
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
+/*    @Autowired
+    private RabbitTemplate rabbitTemplate;*/
 
     @Autowired
     private OssUtil ossUtil;
@@ -62,6 +57,8 @@ public class VideoUploadServiceImpl implements VideoUploadService {
     @Autowired
     @Qualifier("taskExecutor")
     private Executor taskExecutor;
+
+    private static final int MAX_CHUNKS = 10000;
 
     /**
      * 获取视频下一个还没上传的分片序号
@@ -77,17 +74,17 @@ public class VideoUploadServiceImpl implements VideoUploadService {
             return customResponse;
         }
 
-        // 查询本地
-        // 获取分片文件的存储目录
-        File chunkDir = new File(CHUNK_DIRECTORY);
-        // 获取存储在目录中的所有分片文件
-        File[] chunkFiles = chunkDir.listFiles((dir, name) -> name.startsWith(hash + "-"));
-        // 返回还没上传的分片序号
-        if (chunkFiles == null) {
-            customResponse.setData(0);
-        } else {
-            customResponse.setData(chunkFiles.length);
+        // 返回第一个缺失的分片序号。
+        // 不能直接返回文件数量：如果分片是 0、1、3（缺 2），数量 3 会让前端从 3 继续，永远补不上 2。
+        int next = 0;
+        while (next < MAX_CHUNKS) {
+            File chunkFile = Paths.get(CHUNK_DIRECTORY, hash + "-" + next).toFile();
+            if (!chunkFile.exists()) {
+                break;
+            }
+            next++;
         }
+        customResponse.setData(next);
 
         // 查询OSS当前存在的分片数量，即前端要上传的分片序号，建议分布式系统才使用OSS存储分片，单体系统本地存储分片效率更高
 //        int counts = ossUploadUtil.countFiles("chunk/", hash + "-");
@@ -110,6 +107,16 @@ public class VideoUploadServiceImpl implements VideoUploadService {
         if (hash == null || !hash.matches("^[a-zA-Z0-9]{1,64}$")) {
             customResponse.setCode(400);
             customResponse.setMessage("hash值不合法");
+            return customResponse;
+        }
+        if (index == null || index < 0 || index >= MAX_CHUNKS) {
+            customResponse.setCode(400);
+            customResponse.setMessage("分片序号不合法");
+            return customResponse;
+        }
+        if (chunk == null || chunk.isEmpty()) {
+            customResponse.setCode(400);
+            customResponse.setMessage("分片为空");
             return customResponse;
         }
         // 构建分片文件名
@@ -168,7 +175,9 @@ public class VideoUploadServiceImpl implements VideoUploadService {
         // 删除全部分片文件
         if (chunkFiles != null && chunkFiles.length > 0) {
             for (File chunkFile : chunkFiles) {
-                chunkFile.delete(); // 删除分片文件
+                if (!chunkFile.delete()) {
+                    log.warn("本地分片删除失败: {}", chunkFile.getAbsolutePath());
+                }
             }
         }
 //        System.out.println("删除分片完成");
@@ -201,6 +210,8 @@ public class VideoUploadServiceImpl implements VideoUploadService {
             return new CustomResponse(500, "简介太长啦", null);
         }
 
+        // debug：查看方法调用是否是 代理对象
+        log.info("对象：" + this.getClass().getName());
         // 保存封面到本地
 //        try {
 //            // 获取当前时间戳
@@ -208,7 +219,7 @@ public class VideoUploadServiceImpl implements VideoUploadService {
 //            String fileName = timestamp + videoUploadInfo.getHash() + ".jpg";
 //            String path = Paths.get(COVER_DIRECTORY, fileName).toString();
 //            File file = new File(path);
-////            System.out.println(file.getAbsolutePath());
+// //            System.out.println(file.getAbsolutePath());
 //            cover.transferTo(file);
 //            videoUploadInfo.setCoverUrl(file.getAbsolutePath());
 //        } catch (IOException e) {
@@ -216,7 +227,7 @@ public class VideoUploadServiceImpl implements VideoUploadService {
 //        }
 
         // 保存封面到OSS，返回URL
-        String coverUrl = ossUtil.uploadImage(cover, "cover");
+        String coverUrl = ossUtil.uploadImage(cover, FileType.COVER);
 
         // 将投稿信息封装
         videoUploadInfoDTO.setCoverUrl(coverUrl);
@@ -234,9 +245,8 @@ public class VideoUploadServiceImpl implements VideoUploadService {
         CompletableFuture.runAsync(() -> {
             try {
                 mergeChunks(videoUploadInfoDTO);
-            } catch (IOException e) {
-                log.error("合并视频写库时出错了");
-                e.printStackTrace();
+            } catch (Exception e) {
+                log.error("合并视频写库时出错了，hash={}", videoUploadInfoDTO.getHash(), e);
             }
         }, taskExecutor);
 
@@ -247,7 +257,6 @@ public class VideoUploadServiceImpl implements VideoUploadService {
      * 合并分片并将投稿信息写入数据库
      * @param vui 存放投稿信息的 VideoUploadInfo 对象
      */
-    @Transactional
     public void mergeChunks(VideoUploadInfoDTO vui) throws IOException {
         String url; // 视频最终的URL
 
@@ -293,12 +302,12 @@ public class VideoUploadServiceImpl implements VideoUploadService {
 //        }
 
         // 合并到OSS，并返回URL地址
-        url = ossUtil.appendUploadVideo(vui.getHash());
+        url = ossUtil.multipartUploadVideo(vui.getHash());
         if (url == null) {
             return;
         }
 
-        // 存入数据库
+        // 存入数据库：由一个独立的 Bean 执行事务，避免 this 自调用导致 @Transactional 失效。
         Date now = new Date();
         Video video = new Video(
                 null,
@@ -317,9 +326,19 @@ public class VideoUploadServiceImpl implements VideoUploadService {
                 now,
                 null
         );
-        videoMapper.insert(video);
-        VideoStats videoStats = new VideoStats(video.getVid(),0,0,0,0,0,0,0,0);
-        videoStatsMapper.insert(videoStats);
+
+        VideoStats videoStats;
+        try {
+            videoStats = videoPersistService.saveVideoAndStats(video);
+        } catch (RuntimeException e) {
+            // 数据库失败：删掉刚合并出来的 OSS 对象，本地分片保留，便于重试
+            ossUtil.deleteObjectByUrl(url);
+            throw e;
+        }
+
+        // MySQL 已提交，这时才删本地分片；后续 ES/Redis 失败也不会再缺数据源
+        ossUtil.deleteLocalChunks(vui.getHash());
+
         esUtil.addVideo(video);
         // Redis 操作改为同步调用 + try-catch（避免"异步里的异步"导致 addMember 静默丢失，
         // 进而管理端查不到待审核视频）。原代码用 CompletableFuture.runAsync 套异步，

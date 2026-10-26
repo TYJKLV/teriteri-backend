@@ -12,6 +12,7 @@ import com.teriteri.backend.pojo.dto.UserDTO;
 import com.teriteri.backend.service.user.UserService;
 import com.teriteri.backend.service.video.VideoStatsService;
 import com.teriteri.backend.utils.ESUtil;
+import com.teriteri.backend.utils.FileType;
 import com.teriteri.backend.utils.OssUtil;
 import com.teriteri.backend.utils.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -104,18 +105,19 @@ public class UserServiceImpl implements UserService {
             return userDTO;
         }
 
-        // 并发执行每个视频数据统计的查询任务
-        List<VideoStats> list = vidList.stream().parallel()
+        // TODO 使用别的方法实现，替换掉 parallel()
+        // 并发执行每个视频数据统计的查询任务 (IO密集型)
+        List<VideoStats> list = vidList.stream().parallel() // parallel()常用于CPU密集型，而非 IO密集型
                 .map(videoStatsService::getVideoStatsById)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        int video = vidList.size(), love = 0, play = 0;
+        int  love = 0, play = 0;
         for (VideoStats videoStats : list) {
             love = love + videoStats.getGood();
             play = play + videoStats.getPlay();
         }
-        userDTO.setVideoCount(video);
+        userDTO.setVideoCount(vidList.size());
         userDTO.setLoveCount(love);
         userDTO.setPlayCount(play);
         return userDTO;
@@ -141,7 +143,7 @@ public class UserServiceImpl implements UserService {
                     if (vidList.isEmpty()) {
                         return Stream.of(userDTO);
                     }
-
+                    // TODO 使用别的方法实现，替换掉 parallel()
                     // 并发执行每个视频数据统计的查询任务
                     List<VideoStats> videoStatsList = vidList.stream().parallel()
                             .map(videoStatsService::getVideoStatsById)
@@ -229,7 +231,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public CustomResponse updateUserAvatar(Integer uid, MultipartFile file) throws IOException {
         // 保存封面到OSS，返回URL
-        String avatar_url = ossUtil.uploadImage(file, "avatar");
+        String avatar_url = ossUtil.uploadImage(file, FileType.AVATAR);
         // 查旧的头像地址
         User user = userMapper.selectById(uid);
         // 先更新数据库

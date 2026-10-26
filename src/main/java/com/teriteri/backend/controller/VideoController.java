@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.teriteri.backend.utils.ConstantsUtil.RANDOM_VIDEO_COUNT;
+
 @RestController
 public class VideoController {
     @Autowired
@@ -65,7 +67,8 @@ public class VideoController {
     @GetMapping("/video/random/visitor")
     public CustomResponse randomVideosForVisitor() {
         CustomResponse customResponse = new CustomResponse();
-        int count = 11;
+        // RANDOM_VIDEO_COUNT 具体值，是后端单方面规定的，前端不做约束
+        int count = RANDOM_VIDEO_COUNT;
         Set<Object> idSet = redisUtil.srandmember("video_status:1", count);
         List<Map<String, Object>> videoList = new ArrayList<>();
         if (idSet != null && !idSet.isEmpty()) {

@@ -1,6 +1,7 @@
 package com.teriteri.backend.utils;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -49,4 +50,21 @@ public class ConstantsUtil {
 
     //  线程池阻塞队列大小
     public static final Integer BLOCKING_QUEUE = 100;
+
+    // mc_id
+    public static final List<String> MC_ID_LIST = Collections.unmodifiableList(Arrays.asList(
+                "anime", "guochuang", "douga", "game", "kichiku",
+                "music", "dance", "cinephile", "ent", "knowledge",
+                "tech", "information", "food", "life", "car",
+                "fashion", "sports", "animal", "virtual"));
+
+    /**
+     * 这里推送数目有约束吗，或者说 推荐值为多少？
+     * 1. 首页会有两个地方消费 /video/random/visitor 这个接口
+     *      a．IndexVue.vue 的随机推荐网格；
+     *      b．CarouseLIndex.vue 的轮播图，它自己从同一批数据里取最多 6张 (MAX_COUNT=6)
+     * 2.
+     */
+    // 随机推送 视频数目
+    public static final int RANDOM_VIDEO_COUNT = 12;
 }

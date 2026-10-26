@@ -14,6 +14,7 @@ import com.teriteri.backend.mapper.VideoMapper;
 import com.teriteri.backend.pojo.*;
 import com.teriteri.backend.service.video.VideoStatsService;
 import com.teriteri.backend.utils.ESUtil;
+import com.teriteri.backend.utils.FileType;
 import com.teriteri.backend.utils.OssUtil;
 import com.teriteri.backend.utils.RedisUtil;
 import org.junit.jupiter.api.Test;
@@ -117,7 +118,7 @@ class ApplicationTests {
         FileInputStream fileInputStream = new FileInputStream(file);
         MultipartFile multipartFile = new MockMultipartFile(file.getName(), file.getName(),
                 "application/sql", fileInputStream);
-        String url = ossUtil.uploadImage(multipartFile, "cover");
+        String url = ossUtil.uploadImage(multipartFile, FileType.COVER);
         System.out.println(url);
     }
 

@@ -108,7 +108,7 @@ public class DirectVideoUploadConsumer {
 //        }
 
         // 合并到OSS，并返回URL地址
-        url = ossUtil.appendUploadVideo(vui.getHash());
+        url = ossUtil.multipartUploadVideo(vui.getHash());
         if (url == null) {
             return;
         }

@@ -375,11 +375,8 @@ public class VideoServiceImpl implements VideoService {
      * @param status 要修改的状态，1通过 2不通过 3删除
      * @return 无data返回，仅返回响应信息
      */
-    // rollbackFor = Exception.class：本方法抛的是受检异常 IOException，而 Spring 默认只对
-    // RuntimeException / Error 回滚；不显式声明的话，ES / Redis 更新失败时数据库的改动会被提交，
-    // 出现"接口报错但数据库已改、名单和索引还是旧的"的状态分裂。声明后失败即全部撤销，可放心重试。
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class) // IOException:受检异常
     public CustomResponse updateVideoStatus(Integer vid, Integer status) throws IOException {
         CustomResponse customResponse = new CustomResponse();
         Integer userId = currentUser.getUserId();

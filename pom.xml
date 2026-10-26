@@ -27,7 +27,14 @@
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
             <version>1.2.19</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.alibaba</groupId>
+                    <artifactId>druid</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
+        <!-- druid 依赖 -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid</artifactId>
@@ -165,17 +172,17 @@
              <version>4.1.66.Final</version>
          </dependency> -->
 
-        <!--        加入ssl证书认证-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.bouncycastle</groupId>-->
-        <!--            <artifactId>bcprov-jdk15on</artifactId>-->
-        <!--            <version>1.69</version> &lt;!&ndash; 使用最新版本 &ndash;&gt;-->
-        <!--        </dependency>-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.bouncycastle</groupId>-->
-        <!--            <artifactId>bcpkix-jdk15on</artifactId>-->
-        <!--            <version>1.69</version> &lt;!&ndash; 使用最新版本 &ndash;&gt;-->
-        <!--        </dependency>-->
+           <!-- 加入ssl证书认证 -->
+           <!-- <dependency> -->
+           <!--     <groupId>org.bouncycastle</groupId> -->
+           <!--     <artifactId>bcprov-jdk15on</artifactId> -->
+           <!--     <version>1.69</version> &lt;!&ndash; 使用最新版本 &ndash;&gt; -->
+           <!-- </dependency> -->
+           <!-- <dependency> -->
+           <!--     <groupId>org.bouncycastle</groupId> -->
+           <!--     <artifactId>bcpkix-jdk15on</artifactId> -->
+           <!--     <version>1.69</version> &lt;!&ndash; 使用最新版本 &ndash;&gt; -->
+           <!-- </dependency> -->
 
         <!--elasticsearch-->
         <dependency>

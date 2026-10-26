@@ -208,9 +208,6 @@ public class UserAccountServiceImpl implements UserAccountService {
             return customResponse;
         }
 
-        // 顺便更新redis中的数据
-        redisUtil.setExObjectValue("user:" + user.getUid(), user);  // 默认存活1小时
-
         // 检查账号状态，1 表示封禁中，不允许登录
         // 这里的账号状态检验，替代了 UserDetailsImpl中的 四个 isXX()
         if (user.getState() == 1) {
@@ -221,6 +218,8 @@ public class UserAccountServiceImpl implements UserAccountService {
 
         //将uid封装成一个 JWt token，同时token也会被缓存到redis中
         String token = jwtUtil.createToken(user.getUid().toString(), channel);
+        // 顺便更新redis中的数据
+        redisUtil.setExObjectValue("user:" + user.getUid(), user);  // 默认存活1小时
 
         // 每次登录顺便返回user信息，就省去再次发送一次获取用户个人信息的请求
         UserDTO userDTO = new UserDTO();
@@ -276,12 +275,12 @@ public class UserAccountServiceImpl implements UserAccountService {
      */
     @Override
     public CustomResponse adminPersonalInfo() {
-        Integer LoginUserId = currentUser.getUserId();
+        Integer loginUserId = currentUser.getUserId();
         // 从redis中获取最新数据
-        User user = redisUtil.getObject("user:" + LoginUserId, User.class);
+        User user = redisUtil.getObject("user:" + loginUserId, User.class);
         // 如果redis中没有user数据，就从mysql中获取并更新到redis
         if (user == null) {
-            user = userMapper.selectById(LoginUserId);
+            user = userMapper.selectById(loginUserId);
             User finalUser = user;
             CompletableFuture.runAsync(() -> {
                 redisUtil.setExObjectValue("user:" + finalUser.getUid(), finalUser);  // 默认存活1小时
@@ -309,7 +308,7 @@ public class UserAccountServiceImpl implements UserAccountService {
             return customResponse;
         }
         UserDTO userDTO = new UserDTO();
-        // 使用 BeanUtils.copyProperties() api来替代一长串的 setter方法
+        // 使用 BeanUtils.copyProperties() 来替代一长串的 setXX()
         BeanUtils.copyProperties(user,userDTO);
         customResponse.setData(userDTO);
         return customResponse;
@@ -320,17 +319,17 @@ public class UserAccountServiceImpl implements UserAccountService {
      */
     @Override
     public void logout() {
-        Integer LoginUserId = currentUser.getUserId();
+        Integer loginUserId = currentUser.getUserId();
         // 清除redis中该用户的登录认证数据
-        redisUtil.delValue("token:user:" + LoginUserId);
-        redisUtil.delMember("login_member", LoginUserId);   // 从在线用户集合中移除
+        redisUtil.delValue("token:user:" + loginUserId);
+        redisUtil.delMember("login_member", loginUserId);   // 从在线用户集合中移除
 
 
         // TODO 不太清楚，这个是在哪里写入 Redis的
-        redisUtil.deleteKeysWithPrefix("whisper:" + LoginUserId + ":"); // 清除全部在聊天窗口的状态
+        redisUtil.deleteKeysWithPrefix("whisper:" + loginUserId + ":"); // 清除全部在聊天窗口的状态
 
         // 断开全部该用户的channel 并从 userChannel 移除该用户
-        Set<Channel> userChannels = IMServer.userChannel.get(LoginUserId);
+        Set<Channel> userChannels = IMServer.userChannel.get(loginUserId);
         if (userChannels != null) {
             for (Channel channel : userChannels) {
                 try {
@@ -340,7 +339,7 @@ public class UserAccountServiceImpl implements UserAccountService {
                     e.printStackTrace();
                 }
             }
-            IMServer.userChannel.remove(LoginUserId);
+            IMServer.userChannel.remove(loginUserId);
         }
     }
 
@@ -362,6 +361,11 @@ public class UserAccountServiceImpl implements UserAccountService {
             customResponse.setMessage("密码不能为空");
             return customResponse;
         }
+        if (Objects.equals(pw, npw)) {
+            customResponse.setCode(500);
+            customResponse.setMessage("新密码不能与旧密码相同");
+            return customResponse;
+        }
 
         // 取出当前登录的用户（以数据库为准，这里需要 username 作为认证主体）
         Integer uid = currentUser.getUserId();
@@ -380,12 +384,6 @@ public class UserAccountServiceImpl implements UserAccountService {
         } catch (Exception e) {
             customResponse.setCode(403);
             customResponse.setMessage("密码不正确");
-            return customResponse;
-        }
-
-        if (Objects.equals(pw, npw)) {
-            customResponse.setCode(500);
-            customResponse.setMessage("新密码不能与旧密码相同");
             return customResponse;
         }
 

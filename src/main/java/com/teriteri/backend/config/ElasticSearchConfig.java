@@ -32,12 +32,14 @@ public class ElasticSearchConfig {
     @Value("${elasticsearch.password}")
     private String password;
 
-    @Bean(destroyMethod = "close")
+    // @Bean(destroyMethod = "close")  不需要主动设置 close，因为默认值下，它也会调用 close()
+    @Bean
     public RestClient restClient() {
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
         return RestClient
                 .builder(new HttpHost(host, port, "http"))
+                // 配置连接池
                 .setHttpClientConfigCallback(httpClientBuilder -> httpClientBuilder
                         .setDefaultCredentialsProvider(credentialsProvider) // 身份验证
                         .setMaxConnTotal(100)  // 最大总连接数
@@ -48,14 +50,14 @@ public class ElasticSearchConfig {
                 .build();
     }
 
-    @Bean(destroyMethod = "close")
+    @Bean
     public ElasticsearchTransport transport() {
         return new RestClientTransport(restClient(), new JacksonJsonpMapper());
     }
 
     @Bean
     public ElasticsearchClient elasticsearchClient() {
+         // 方法互调，这是一种写法，还有一种是参数注入
         return new ElasticsearchClient(transport());
     }
-
 }
