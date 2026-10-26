@@ -9,12 +9,13 @@ import com.teriteri.backend.service.category.CategoryService;
 import com.teriteri.backend.utils.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+
+import static com.teriteri.backend.utils.ConstantsUtil.MC_ID_LIST;
 
 @Slf4j
 @Service
@@ -27,7 +28,6 @@ public class CategoryServiceImpl implements CategoryService {
     private RedisUtil redisUtil;
 
     @Autowired
-    @Qualifier("taskExecutor")
     private Executor taskExecutor;
 
     /**
@@ -48,7 +48,7 @@ public class CategoryServiceImpl implements CategoryService {
             }
             log.warn("redis中获取不到分区数据");
         } catch (Exception e) {
-            log.error("获取redis分区数据失败");
+            log.error("获取redis分区数据失败", e);
         }
 
         // 将分区表一次全部查询出来，再在内存执行处理逻辑，可以减少数据库的IO
@@ -87,26 +87,32 @@ public class CategoryServiceImpl implements CategoryService {
             scMap.put("descr", descr);
             scMap.put("rcmTag", rcmTag);
             categoryDTOMap.get(mcId).getScList().add(scMap);
-
         }
 
-        // 按指定序列排序
-        List<String> sortOrder = Arrays.asList("anime", "guochuang", "douga", "game", "kichiku",
-                "music", "dance", "cinephile", "ent", "knowledge",
-                "tech", "information", "food", "life", "car",
-                "fashion", "sports", "animal", "virtual");
+        /**
+         * 那如果我改变了 这里的顺序，前端还能正常接收吗？另外，前端应该有一个映射表对吗，因为这里都是 拼音/英文，页面显示则是 汉字 ？
+         * 1. MC_ID_LIST 顺序可以进行更改，前端正常接收，会改变页面布局
+         * 2. 前端并没有 映射表，而是 后端返回的 CategoryDTO中有 mcId/scId，以及 mcName/scName：中文显示名
+         */
 
-        for (String mcId : sortOrder) {
+        // MC_ID_LIST：按指定序列排序
+        for (String mcId : MC_ID_LIST) {
             if (categoryDTOMap.containsKey(mcId)) {
                 sortedCategories.add(categoryDTOMap.get(mcId));
             }
         }
         // 将分类添加到redis缓存中
         try {
+            /**
+             * 1. 必须先删除，才能进行添加吗 ?
+             *    默认情况下，是这样的；因为 setAllList()的底层是 rightPushAll()，Redis的 Push 是 追加，而非覆盖
+             * 2. setAllList()默认设置 ttl是多少 ?
+             *    它没有设置 ttl，因此是 永久缓存
+             */
             redisUtil.delValue("categoryList");
             redisUtil.setAllList("categoryList", sortedCategories);
         } catch (Exception e) {
-            log.error("存储redis分类列表失败");
+            log.error("存储redis分类列表失败", e);
         }
         customResponse.setData(sortedCategories);
         return customResponse;
@@ -117,6 +123,11 @@ public class CategoryServiceImpl implements CategoryService {
      * @param mcId 主分区ID
      * @param scId 子分区ID
      * @return Category类信息
+     */
+    /**
+    *  我觉得，若这个key只存在 1h，那其实没什么用，不如 直接查 mysql，而取消 redis查询 ?
+    *  1. 实际上，并非这样，它的调用频率比我想的高；
+    *  2. 另外，getCategoryById() 是 每条视频调一次，而非 每个分类调一次
      */
     @Override
     public Category getCategoryById(String mcId, String scId) {

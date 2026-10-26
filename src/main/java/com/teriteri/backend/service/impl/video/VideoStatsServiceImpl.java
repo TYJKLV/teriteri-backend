@@ -43,7 +43,6 @@ public class VideoStatsServiceImpl implements VideoStatsService {
                 return null;
             }
         }
-        // 多线程查redis反而更慢了，所以干脆直接查数据库
         return videoStats;
     }
 

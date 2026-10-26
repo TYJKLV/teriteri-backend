@@ -219,7 +219,7 @@ public class RedisUtil {
      */
     public boolean zset(String key, Object object) {
         long now = System.currentTimeMillis();
-        return this.zsetWithScore(key, object, now);
+        return zsetWithScore(key, object, now);
     }
 
     /**
@@ -333,9 +333,9 @@ public class RedisUtil {
     }
 
     public Boolean zsetByLimit(String key, Object value, Integer limit) {
-        Boolean result = this.zset(key, value);
+        Boolean result = zset(key, value);
         // 存入数据后，查询zset中的数量
-        Long count = this.zCard(key);
+        Long count = zCard(key);
         // 如果数量大于limit，则进行清除操作，清除之前的数据
         if (count != null && count > limit) {
             redisTemplate.opsForZSet().removeRange(key, 0, count - limit - 1);
@@ -423,7 +423,7 @@ public class RedisUtil {
     }
 
     /**
-     * 随机返回集合中count个元素的集合
+     * 随机返回集合中count个元素的集合；若 count >= set().size，则返回集合中全部元素
      *
      * @param key
      * @param count
@@ -650,7 +650,7 @@ public class RedisUtil {
      * @return
      */
     public Long setAllList(String key, List list) {
-        return this.redisTemplate.opsForList().rightPushAll(key, list.toArray());
+        return redisTemplate.opsForList().rightPushAll(key, list.toArray());
     }
 
     /**
@@ -661,7 +661,7 @@ public class RedisUtil {
      * @return
      */
     public <T> List<T> getAllList(String key, Class<T> clazz) {
-        return (List<T>) this.redisTemplate.opsForList().range(key, 0, -1);
+        return (List<T>) redisTemplate.opsForList().range(key, 0, -1);
     }
 
     // List 相关操作 end ------------------------------------------------------------------------------------------------
